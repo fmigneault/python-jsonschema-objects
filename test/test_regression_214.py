@@ -1,4 +1,5 @@
 import json
+import jsonschema
 import pytest
 import python_jsonschema_objects as pjo
 
@@ -14,7 +15,7 @@ schema = {
             "properties": {
                 "location": {
                     "title": "location",
-                    "type": ["object", "string"],
+                    #"type": ["object", "number", "string"],
                     "oneOf": [
                         {"$ref": "#/definitions/UNIQUE_STRING"},
                         {"$ref": "#/definitions/Location"},
@@ -25,23 +26,27 @@ schema = {
         "Location": {
             "title": "Location",
             "description": "A Location represents a span on a specific sequence.",
-            "type": "object",
+            #"type": ["object", "number"],
             "oneOf": [
                 {"$ref": "#/definitions/Location1"},
                 {"$ref": "#/definitions/Location2"},
             ],
-            "discriminator": {"propertyName": "type"},
+            #"discriminator": {"propertyName": "type"},
         },
+        # "Location1": {
+        #     "additionalProperties": False,
+        #     "type": "object",
+        #     "properties": {
+        #         "type": {
+        #             "type": "string",
+        #             "enum": ["Location1"],
+        #             "default": "Location1",
+        #         }
+        #     },
+        # },
         "Location1": {
-            "additionalProperties": False,
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": ["Location1"],
-                    "default": "Location1",
-                }
-            },
+            "type": "number",
+            "minimum": 1,
         },
         "Location2": {
             "additionalProperties": False,
@@ -72,10 +77,15 @@ def test_nested_oneofs_still_work(schema_json):
     builder = pjo.ObjectBuilder(schema_json)
     ns = builder.build_classes()
 
-    obj1 = ns.MainObject(**{"location": {"type": "Location1"}})
+    resolver = jsonschema.RefResolver.from_schema(schema_json)
+    jsonschema.validate({"location": 2}, schema_json["definitions"]["MainObject"], resolver=resolver)  # OK!
+
+    #obj1 = ns.MainObject(**{"location": {"type": "Location1"}})
+    obj1 = ns.MainObject(**{"location": 2})  # FAIL!
     obj2 = ns.MainObject(**{"location": {"type": "Location2"}})
     obj3 = ns.MainObject(**{"location": "unique:12"})
 
-    assert obj1.location.type == "Location1"
+    #assert obj1.location.type == "Location1"
+    assert obj1.location == 2
     assert obj2.location.type == "Location2"
     assert obj3.location == "unique:12"
